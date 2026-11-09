@@ -53,6 +53,7 @@
   .card { width:100%; max-width:360px; background:var(--panel); border:1px solid var(--line); border-radius:28px; padding:28px 24px; text-align:center; }
   .card h1 { margin:0 0 6px; font-size:24px; }
   .card p { margin:0 0 20px; color:var(--dim); font-size:15px; }
+  .card p.where { margin:-10px 0 18px; font-size:13px; line-height:1.4; }
   #pin { width:100%; background:var(--bg); border:1px solid var(--line); border-radius:16px; color:var(--text);
     font:700 32px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.3em; text-align:center; padding:14px 8px; outline:none;
     -webkit-user-select:text; user-select:text; }
@@ -111,6 +112,7 @@
   <div class="card">
     <h1 data-i18n="login_title">Тачпад</h1>
     <p data-i18n="login_hint">Введи PIN с экрана Mac</p>
+    <p class="where" id="loginWhere"></p>
     <input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="••••••">
     <div id="loginErr"></div>
     <button class="primary" id="loginBtn" data-i18n="login_btn">Войти</button>
@@ -176,6 +178,7 @@
   const I18N = {
     ru: {
       login_title: 'Тачпад', login_hint: 'Введи PIN с экрана Mac', login_btn: 'Войти',
+      login_where: p => `PIN виден на Mac: открой в браузере localhost:${p}/qr или дважды кликни start.command`,
       connecting: 'Подключаюсь…', connected: 'Подключено к Mac', offline: 'Нет связи с Mac',
       wrong_pin: 'Неверный PIN', too_many: n => `Слишком много попыток. Подожди ${n} с`,
       settings: 'Настройки',
@@ -190,6 +193,7 @@
     },
     en: {
       login_title: 'Touchpad', login_hint: 'Enter the PIN shown on your Mac', login_btn: 'Connect',
+      login_where: p => `The PIN is shown on your Mac: open localhost:${p}/qr in a browser, or double-click start.command`,
       connecting: 'Connecting…', connected: 'Connected to your Mac', offline: "Can't reach your Mac",
       wrong_pin: 'Wrong PIN', too_many: n => `Too many attempts. Wait ${n} s`,
       settings: 'Settings',
@@ -220,6 +224,7 @@
     document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', tr(el.dataset.i18nAria)); });
     document.querySelectorAll('#sLang button').forEach(b => b.classList.toggle('on', b.dataset.v === (S.lang || 'auto')));
     document.title = tr('login_title');
+    $('#loginWhere').textContent = tr('login_where', location.port || '80');
     buildKeys();
     setStatus(statusState[0], statusState[1]);
   }
