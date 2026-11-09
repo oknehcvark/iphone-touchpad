@@ -39,8 +39,8 @@ Use your iPhone as a wireless trackpad and keyboard for your Mac. There is nothi
 
    You can also double-click `start.command`.
 3. macOS asks to let the app that runs the server (Terminal) control the computer. In **System Settings → Privacy & Security → Accessibility** switch it on, then run the command again.
-4. A page opens on the Mac with a QR code and a PIN. Scan the code with the iPhone camera, open the link in Safari and enter the PIN once. The phone remembers it.
-5. Optional: in Safari tap **Share → Add to Home Screen** to get an app-like icon that opens full screen.
+4. A page opens on the Mac with a QR code and a PIN. Scan the code with the iPhone camera, open the link in Safari and enter the PIN once. The phone remembers it for good.
+5. Optional: in Safari tap **Share → Add to Home Screen** to get an app-like icon that opens full screen. The QR code opens the Mac's `.local` name (for example `http://YourMac.local:8899/`), which stays the same on every Wi-Fi network, so the icon keeps working when the network changes. Both devices just need to be on the same network.
 
 ### Start at login
 
@@ -83,7 +83,7 @@ The Mac runs a small HTTP + WebSocket server (`server.py`). Safari loads `index.
 
 ## Security
 
-- Anyone who knows the PIN and is on your network can control your Mac. The PIN is 6 random digits kept in `.pin` (it is in `.gitignore`). After 5 wrong attempts the server locks out PIN checks for a while, longer with each failure.
+- Anyone who knows the PIN and is on your network can control your Mac. The PIN is 6 random digits kept in `.pin` (it is in `.gitignore`). After 5 wrong attempts the server locks out PIN checks for a while, longer with each failure. After the first sign-in the phone gets a signed device token (stored in an HttpOnly cookie and in local storage), so it does not ask for the PIN again. Deleting `.pin` creates a new PIN and signs out every phone. WebSockets from other web pages are refused.
 - Traffic is plain HTTP on your local network and is not encrypted. Use it on a Wi-Fi network you trust, and never forward the port to the internet.
 - The server listens on all network interfaces, port 8899. Stop it with Ctrl+C or remove the autostart when you do not need it.
 - The QR / PIN page (`/qr`) and `/status` are only served to the Mac itself, and only under `localhost` names, which also blocks DNS-rebinding tricks from web pages.
@@ -92,6 +92,7 @@ The Mac runs a small HTTP + WebSocket server (`server.py`). Safari loads `index.
 
 - **The page does not open on the phone.** Check that both devices are on the same Wi-Fi (guest networks often isolate devices). If the macOS firewall is on, allow incoming connections for Python when it asks. Try the address printed in the terminal, or the `YourMac.local` name.
 - **The page opens but the cursor does not move.** The app that runs the server needs Accessibility access: Terminal when started by hand, **Python** when started by autostart. Switch it on and restart the server.
+- **The `.local` name does not open.** Some office and guest networks block it. Use the numeric address shown under the QR code (it changes with the network).
 - **Scrolling goes the wrong way.** Toggle *Natural scrolling* in the settings.
 - **Port 8899 is busy.** Start with another port: `TOUCHPAD_PORT=8900 python3 server.py`.
 - **Forgot the PIN.** On the Mac open `http://localhost:8899/qr` in any browser (no Terminal needed, bookmark it), or double-click `start.command`. It is also the content of the `.pin` file. The PIN never changes unless you delete that file.

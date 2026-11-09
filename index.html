@@ -231,6 +231,9 @@
 
   /* ── connection ── */
   let ws = null, authed = false, retry = 0, pin = store.get('tp.pin'), pingT = 0, reconnT = 0;
+  // A remembered phone: after a correct PIN the Mac gives this device a signed token. It is kept here and
+  // in an HttpOnly cookie, so the PIN is asked for once, not every time.
+  let token = store.get('tp.token'), helloDone = false, helloT = 0;
 
   function setStatus(kind, key) {
     statusState = [kind, key];
@@ -253,6 +256,16 @@
   function sendAuth(p) {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'auth', pin: p }));
   }
+  function tryRemembered() {                       // sign in with what this phone remembers, otherwise ask for the PIN
+    if (token && ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'auth', token }));
+    else if (pin) sendAuth(pin);
+    else showLogin('');
+  }
+  function signedIn() {
+    authed = true;
+    showApp(); setStatus('ok', 'connected');
+    clearInterval(pingT); pingT = setInterval(() => ws && ws.readyState === 1 && ws.send('{"t":"ping"}'), 10000);
+  }
 
   function connect() {
     clearTimeout(reconnT);
@@ -260,16 +273,31 @@
     setStatus('wait', 'connecting');
     ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
     const mine = ws;
-    mine.onopen = () => { retry = 0; if (pin) sendAuth(pin); else showLogin(''); };
+    mine.onopen = () => {
+      retry = 0; helloDone = false;
+      clearTimeout(helloT);
+      helloT = setTimeout(() => { if (!helloDone) { helloDone = true; tryRemembered(); } }, 1500);   // old server: no hello
+    };
     mine.onmessage = ev => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
+      if (m.t === 'hello') {                       // the server says right away if the cookie already signed us in
+        clearTimeout(helloT); helloDone = true;
+        if (m.authed) signedIn(); else tryRemembered();
+        return;
+      }
       if (m.t !== 'auth') return;
       if (m.ok) {
-        authed = true; store.set('tp.pin', pin);
-        showApp(); setStatus('ok', 'connected');
-        clearInterval(pingT); pingT = setInterval(() => ws && ws.readyState === 1 && ws.send('{"t":"ping"}'), 10000);
+        if (m.token) { token = m.token; store.set('tp.token', token); }
+        if (token) fetch('/remember', { method: 'POST', headers: { 'X-TP-Token': token } }).catch(() => {});   // (re)sets the cookie
+        if (pin) store.set('tp.pin', pin);
+        signedIn();
       } else {
-        authed = false; pin = ''; store.del('tp.pin');
+        authed = false;
+        if (token) {                               // the token was refused (the PIN changed): try the saved PIN once
+          token = ''; store.del('tp.token');
+          if (pin) { sendAuth(pin); return; }
+        }
+        pin = ''; store.del('tp.pin');
         showLogin(m.wait ? tr('too_many', m.wait) : tr('wrong_pin'));
       }
     };
@@ -529,9 +557,12 @@
   $('#sTrail').addEventListener('change', e => { S.trail = e.target.checked; saveS(); });
   $('#gear').addEventListener('click', () => sheet.classList.add('open'));
   $('#sDone').addEventListener('click', () => sheet.classList.remove('open'));
-  $('#sLogout').addEventListener('click', () => {
-    store.del('tp.pin'); pin = ''; authed = false; sheet.classList.remove('open');
-    if (ws) ws.close(); showLogin('');
+  $('#sLogout').addEventListener('click', async () => {
+    store.del('tp.pin'); store.del('tp.token'); pin = ''; token = ''; authed = false;
+    sheet.classList.remove('open');
+    try { await fetch('/forget', { method: 'POST' }); } catch {}      // clears the device cookie too
+    if (ws) ws.close();
+    showLogin('');
   });
 
   applyLang();

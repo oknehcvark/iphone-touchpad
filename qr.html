@@ -18,6 +18,7 @@
   .url { font:600 17px ui-monospace,SFMono-Regular,Menlo,monospace; word-break:break-all; color:var(--accent); }
   .pin { margin-top:18px; font:700 40px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.18em; }
   .small { margin-top:6px; font-size:13px; }
+  .alt { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--text); }
 </style>
 </head>
 <body>
@@ -28,17 +29,19 @@
   <div class="url">__URL__</div>
   <div class="pin">__PIN__</div>
   <p class="small" id="note"></p>
+  <p class="small"><span id="alt"></span> <span class="alt">__ALT__</span></p>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
   const T = {
-    en: { title: 'Touchpad for iPhone', scan: 'Point your iPhone camera at the code', note: 'Enter the PIN once on the phone, it will remember it', noqr: 'The QR code did not load, type the address by hand' },
-    ru: { title: 'Тачпад для iPhone', scan: 'Наведи камеру iPhone на код', note: 'PIN вводится один раз на телефоне, дальше он запомнит', noqr: 'QR не загрузился, введи адрес вручную' },
+    en: { title: 'Touchpad for iPhone', scan: 'Point your iPhone camera at the code', note: 'Enter the PIN once on the phone, it will remember it', noqr: 'The QR code did not load, type the address by hand', alt: 'If the name does not open on your network, use the number:' },
+    ru: { title: 'Тачпад для iPhone', scan: 'Наведи камеру iPhone на код', note: 'PIN вводится один раз на телефоне, дальше он запомнит', noqr: 'QR не загрузился, введи адрес вручную', alt: 'Если имя в этой сети не открывается, используй цифры:' },
   }[document.documentElement.lang] || {};
   document.title = T.title;
   document.getElementById('title').textContent = T.title;
   document.getElementById('scan').textContent = T.scan;
   document.getElementById('note').textContent = T.note;
+  document.getElementById('alt').textContent = T.alt;
   try {
     new QRCode(document.getElementById('qr'), { text: '__URL__', width: 216, height: 216, correctLevel: QRCode.CorrectLevel.M });
   } catch (e) {

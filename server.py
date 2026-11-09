@@ -19,6 +19,7 @@ import base64
 import ctypes
 import ctypes.util
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -51,6 +52,52 @@ def local_request(peer, headers):
     if not host.endswith("]"):
         host = host.rsplit(":", 1)[0]
     return peer in LOOPBACK and host in LOCAL_HOSTS
+
+
+# ── remembered devices ──
+# After a correct PIN the server hands the phone a signed device token. The phone keeps it in
+# localStorage and in an HttpOnly cookie, so it never has to ask for the PIN again. The token is
+# an HMAC keyed by the PIN: nothing is stored on the Mac, and changing the PIN signs out every
+# device.
+def make_token():
+    nonce = secrets.token_hex(8)
+    return nonce + "." + hmac.new(PIN.encode(), b"tp-device:" + nonce.encode(), hashlib.sha256).hexdigest()
+
+
+def valid_token(token):
+    nonce, _, mac = str(token).partition(".")
+    if not nonce or not mac:
+        return False
+    good = hmac.new(PIN.encode(), b"tp-device:" + nonce.encode(), hashlib.sha256).hexdigest()
+    return secrets.compare_digest(mac, good)
+
+
+def cookie_token(headers):
+    for part in headers.get("cookie", "").split(";"):
+        key, _, value = part.strip().partition("=")
+        if key == "tp":
+            return value
+    return ""
+
+
+def same_origin(headers):
+    """A WebSocket from another web page (cross-site hijacking) must not be accepted."""
+    origin = headers.get("origin")
+    if not origin:
+        return True
+    return origin.split("://", 1)[-1].lower() == headers.get("host", "").lower()
+
+
+def bonjour_name():
+    """The Mac's stable local name, for example 'MyMac.local' (it does not change with the network)."""
+    try:
+        name = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True, timeout=2).stdout.strip()
+        if name:
+            return name + ".local"
+    except (OSError, subprocess.SubprocessError):
+        pass
+    host = socket.gethostname()
+    return host if host.endswith(".local") else None
 # Icons from the assets folder (only this list is served, nothing else on disk)
 ASSETS = {
     "/icon.svg": ("icon.svg", "image/svg+xml"),
@@ -395,7 +442,7 @@ def num(v, lim=5000.0):
     return max(-lim, min(lim, v))
 
 
-async def ws_session(reader, writer, key, peer):
+async def ws_session(reader, writer, key, peer, pre_auth=False):
     global auth_fails, auth_locked_until
     accept = base64.b64encode(hashlib.sha1(key.encode() + GUID).digest())
     writer.write(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n"
@@ -403,8 +450,11 @@ async def ws_session(reader, writer, key, peer):
     sock = writer.get_extra_info("socket")
     if sock is not None:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    authed = False
+    authed = pre_auth                    # a valid device cookie signs the phone in right away
+    if authed:
+        CLIENTS.add(writer)
     print(m("conn", peer=peer))
+    ws_send(writer, {"t": "hello", "authed": authed})
     try:
         while True:
             op, payload = await asyncio.wait_for(read_frame(reader), 30)
@@ -420,6 +470,15 @@ async def ws_session(reader, writer, key, peer):
                 t = msg.get("t")
             except (ValueError, AttributeError):
                 continue
+            if t == "auth" and msg.get("token"):        # a remembered device signs in with its token
+                if valid_token(msg["token"]):
+                    authed = True
+                    CLIENTS.add(writer)
+                    ws_send(writer, {"t": "auth", "ok": True})
+                    print(m("authok", peer=peer))
+                else:
+                    ws_send(writer, {"t": "auth", "ok": False, "wait": 0})
+                continue
             if t == "auth":
                 now = time.monotonic()
                 if now < auth_locked_until:
@@ -429,7 +488,7 @@ async def ws_session(reader, writer, key, peer):
                     authed = True
                     CLIENTS.add(writer)
                     auth_fails = 0
-                    ws_send(writer, {"t": "auth", "ok": True})
+                    ws_send(writer, {"t": "auth", "ok": True, "token": make_token()})
                     print(m("authok", peer=peer))
                 else:
                     auth_fails += 1
@@ -491,12 +550,12 @@ def lan_ips():
     return ips
 
 
-def http(writer, status, body, ctype="text/html; charset=utf-8"):
+def http(writer, status, body, ctype="text/html; charset=utf-8", extra=""):
     if isinstance(body, str):
         body = body.encode()
     writer.write(
         f"HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {len(body)}\r\n"
-        f"Cache-Control: no-store\r\nConnection: close\r\n\r\n".encode() + body
+        f"Cache-Control: no-store\r\nConnection: close\r\n{extra}\r\n".encode() + body
     )
 
 
@@ -504,7 +563,7 @@ async def handle(reader, writer):
     try:
         head = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 10)
         lines = head.decode("latin-1").split("\r\n")
-        _, target, _ = lines[0].split(" ", 2)
+        method, target, _ = lines[0].split(" ", 2)
         h = {}
         for line in lines[1:]:
             if ":" in line:
@@ -513,7 +572,21 @@ async def handle(reader, writer):
         path = target.split("?", 1)[0]
         peer = (writer.get_extra_info("peername") or ("?",))[0]
         if path == "/ws" and h.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in h:
-            await ws_session(reader, writer, h["sec-websocket-key"], peer)
+            if same_origin(h):
+                await ws_session(reader, writer, h["sec-websocket-key"], peer,
+                                 pre_auth=valid_token(cookie_token(h)))
+            else:
+                http(writer, "403 Forbidden", "forbidden", "text/plain; charset=utf-8")
+        elif path == "/remember" and method == "POST":
+            token = h.get("x-tp-token", "")
+            if same_origin(h) and valid_token(token):
+                cookie = f"Set-Cookie: tp={token}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Strict\r\n"
+                http(writer, "204 No Content", b"", "text/plain", cookie)
+            else:
+                http(writer, "403 Forbidden", "forbidden", "text/plain; charset=utf-8")
+        elif path == "/forget" and method == "POST" and same_origin(h):
+            http(writer, "204 No Content", b"", "text/plain",
+                 "Set-Cookie: tp=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict\r\n")
         elif path == "/":
             lang = pick_lang(h.get("accept-language"))
             page = ((HERE / "index.html").read_text()
@@ -530,15 +603,17 @@ async def handle(reader, writer):
             http(writer, "200 OK", json.dumps(manifest, ensure_ascii=False),
                  "application/manifest+json; charset=utf-8")
         elif path == "/status" and local_request(peer, h):
-            body = {"pin": PIN, "port": PORT, "host": socket.gethostname(),
+            body = {"pin": PIN, "port": PORT, "host": bonjour_name() or socket.gethostname(),
                     "urls": [f"http://{ip}:{PORT}/" for ip in lan_ips()],
                     "clients": len(CLIENTS), "trusted": ax_trusted()}
             http(writer, "200 OK", json.dumps(body), "application/json")
         elif path == "/qr" and local_request(peer, h):
             ips = lan_ips()
-            url = f"http://{ips[0] if ips else 'localhost'}:{PORT}/"
-            page = ((HERE / "qr.html").read_text().replace("__URL__", url).replace("__PIN__", PIN)
-                    .replace("__LANG__", pick_lang(h.get("accept-language"))))
+            by_ip = f"http://{ips[0] if ips else 'localhost'}:{PORT}/"
+            name = bonjour_name()
+            url = f"http://{name}:{PORT}/" if name else by_ip      # the name does not change with the network
+            page = ((HERE / "qr.html").read_text().replace("__URL__", url).replace("__ALT__", by_ip)
+                    .replace("__PIN__", PIN).replace("__LANG__", pick_lang(h.get("accept-language"))))
             http(writer, "200 OK", page)
         elif path in ASSETS:
             name, ctype = ASSETS[path]
@@ -578,7 +653,7 @@ async def main():
     print(f"\n  {m('started')}\n")
     for ip in ips:
         print("  " + m("addr", ip=ip, port=PORT))
-    print("  " + m("byname", host=socket.gethostname(), port=PORT))
+    print("  " + m("byname", host=bonjour_name() or socket.gethostname(), port=PORT))
     print("  " + m("pin", pin=PIN))
     print("  " + m("qr", port=PORT))
     if not trusted:
