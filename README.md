@@ -84,7 +84,7 @@ The Mac runs a small HTTP + WebSocket server (`server.py`). Safari loads `index.
 - **The page opens but the cursor does not move.** The app that runs the server needs Accessibility access: Terminal when started by hand, **Python** when started by autostart. Switch it on and restart the server.
 - **Scrolling goes the wrong way.** Toggle *Natural scrolling* in the settings.
 - **Port 8899 is busy.** Start with another port: `TOUCHPAD_PORT=8900 python3 server.py`.
-- **Forgot the PIN.** It is the content of the `.pin` file.
+- **Forgot the PIN.** On the Mac open `http://localhost:8899/qr` in any browser (no Terminal needed, bookmark it), or double-click `start.command`. It is also the content of the `.pin` file. The PIN never changes unless you delete that file.
 
 ## Files
 
