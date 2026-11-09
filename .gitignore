@@ -1,0 +1,12 @@
+# Your private PIN (created on first run). Never commit it.
+.pin
+
+# Logs
+*.log
+
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+*.pyc

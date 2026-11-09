@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="__LANG__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="__APP_NAME__">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#09090b">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>__APP_NAME__</title>
+<script>
+  /* Theme: dark by default, the system setting is ignored. Applied before first paint to avoid a flash. */
+  try {
+    var th = (JSON.parse(localStorage.getItem('tp.settings') || '{}') || {}).theme;
+    document.documentElement.dataset.theme = th === 'light' ? 'light' : 'dark';
+    if (th === 'light') document.querySelector('meta[name="theme-color"]').content = '#f2f2f7';
+  } catch (e) { document.documentElement.dataset.theme = 'dark'; }
+</script>
+<style>
+  :root {
+    --bg:#09090b; --panel:#141417; --panel2:#1c1c21; --line:#2a2a30;
+    --text:#f2f2f5; --dim:#8b8b95; --accent:#0a84ff;
+    --ok:#30d158; --warn:#ffd60a; --bad:#ff453a;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg:#f2f2f7; --panel:#ffffff; --panel2:#ececf1; --line:#d8d8de;
+    --text:#111113; --dim:#6b6b76; --accent:#0a84ff;
+    --ok:#1f9d45; --warn:#c99700; --bad:#e0352b;
+    color-scheme: light;
+  }
+  /* In an installed web app the iOS status bar keeps white text, so the light theme gets a black strip under it */
+  :root[data-theme="light"] body::before { content:""; position:fixed; left:0; right:0; top:0; height:env(safe-area-inset-top); background:#000; z-index:9; pointer-events:none; }
+  .seg { display:flex; gap:3px; padding:3px; background:var(--bg); border:1px solid var(--line); border-radius:12px; }
+  .seg button { border:0; background:transparent; color:var(--dim); font-size:14px; padding:7px 14px; border-radius:9px; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); overscroll-behavior:none;
+    font:16px/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; }
+  body { position:fixed; inset:0; display:flex; flex-direction:column;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  button { font:inherit; color:inherit; }
+
+  /* PIN screen */
+  #login { display:none; flex:1; align-items:center; justify-content:center; padding:24px; }
+  #login.show { display:flex; }
+  .card { width:100%; max-width:360px; background:var(--panel); border:1px solid var(--line); border-radius:28px; padding:28px 24px; text-align:center; }
+  .card h1 { margin:0 0 6px; font-size:24px; }
+  .card p { margin:0 0 20px; color:var(--dim); font-size:15px; }
+  #pin { width:100%; background:var(--bg); border:1px solid var(--line); border-radius:16px; color:var(--text);
+    font:700 32px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.3em; text-align:center; padding:14px 8px; outline:none;
+    -webkit-user-select:text; user-select:text; }
+  #pin:focus { border-color:var(--accent); }
+  #loginErr { min-height:20px; margin:12px 0 0; color:var(--bad); font-size:14px; }
+  .primary { width:100%; margin-top:8px; height:52px; border:0; border-radius:16px; background:var(--accent); color:#fff; font-weight:600; font-size:17px; }
+
+  /* main screen */
+  #app { display:none; flex:1; min-height:0; flex-direction:column; gap:10px; padding:10px 14px 14px; }
+  #app.show { display:flex; }
+  header { display:flex; align-items:center; gap:10px; height:34px; flex:none; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--warn); flex:none; transition:background .2s; }
+  .dot.ok { background:var(--ok); } .dot.bad { background:var(--bad); }
+  #status { flex:1; color:var(--dim); font-size:14px; }
+  .icon { width:36px; height:36px; padding:0; display:grid; place-items:center; border-radius:12px; border:1px solid var(--line); background:var(--panel); }
+  .icon svg { display:block; }
+
+  #pad { position:relative; flex:1; min-height:120px; background:var(--panel); border:1px solid var(--line); border-radius:28px;
+    touch-action:none; overflow:hidden; transition:background .12s, border-color .12s; }
+  #pad.flash { background:var(--panel2); border-color:#3a3a42; }
+  #hint { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    color:var(--dim); font-size:14px; text-align:center; pointer-events:none; padding:24px; transition:opacity .4s; }
+  #hint b { color:var(--text); font-weight:600; }
+  #pad.used #hint { opacity:0; }
+  #trail { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+  #btns { display:flex; gap:10px; flex:none; }
+  .big { flex:1; height:60px; border-radius:20px; border:1px solid var(--line); background:var(--panel); font-weight:600; font-size:16px; color:var(--dim); touch-action:none; }
+  .big.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  #keys { display:flex; gap:8px; overflow-x:auto; flex:none; padding-bottom:2px; touch-action:pan-x; scrollbar-width:none; }
+  #keys::-webkit-scrollbar { display:none; }
+  .chip { flex:none; height:42px; min-width:46px; padding:0 14px; border-radius:21px; border:1px solid var(--line); background:var(--panel); font-size:15px; white-space:nowrap; }
+  .chip:active, .chip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .chip.kb { font-weight:600; }
+
+  #kbd { position:fixed; left:-200px; top:0; width:10px; height:10px; opacity:0; font-size:16px; border:0; padding:0; -webkit-user-select:text; user-select:text; }
+
+  /* settings sheet */
+  #sheet { position:fixed; left:0; right:0; bottom:0; background:var(--panel); border-top:1px solid var(--line); border-radius:28px 28px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom)); transform:translateY(105%); transition:transform .25s ease; z-index:5; }
+  #sheet.open { transform:none; box-shadow:0 -12px 40px rgba(0,0,0,.2); }
+  #sheet h2 { margin:0 0 14px; font-size:18px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:10px 0; border-top:1px solid var(--line); }
+  .row:first-of-type { border-top:0; }
+  .row label { font-size:15px; }
+  .row input[type=range] { flex:1; max-width:55%; accent-color:var(--accent); }
+  .row input[type=checkbox] { width:26px; height:26px; accent-color:var(--accent); }
+  .ghost { width:100%; margin-top:12px; height:46px; border-radius:14px; border:1px solid var(--line); background:transparent; font-size:15px; }
+  .ghost.danger { color:var(--bad); }
+</style>
+</head>
+<body>
+
+<section id="login">
+  <div class="card">
+    <h1 data-i18n="login_title">Тачпад</h1>
+    <p data-i18n="login_hint">Введи PIN с экрана Mac</p>
+    <input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="••••••">
+    <div id="loginErr"></div>
+    <button class="primary" id="loginBtn" data-i18n="login_btn">Войти</button>
+  </div>
+</section>
+
+<section id="app">
+  <header>
+    <span class="dot" id="dot"></span>
+    <span id="status">Подключаюсь…</span>
+    <button class="icon" id="gear" aria-label="Настройки" data-i18n-aria="settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <div id="pad">
+    <canvas id="trail"></canvas>
+    <div id="hint">
+      <div data-i18n-html="hint1"><b>Один палец</b> — курсор</div>
+      <div data-i18n-html="hint2"><b>Тап</b> — клик · <b>тап и тащи</b> — перетаскивание</div>
+      <div data-i18n-html="hint3"><b>Два пальца</b> — прокрутка · <b>тап двумя</b> — правый клик</div>
+    </div>
+  </div>
+
+  <div id="btns">
+    <button class="big" id="bl" data-i18n="left">Левая кнопка</button>
+    <button class="big" id="br" data-i18n="right">Правая кнопка</button>
+  </div>
+
+  <div id="keys"></div>
+</section>
+
+<input id="kbd" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="enter">
+
+<div id="sheet">
+  <h2 data-i18n="settings">Настройки</h2>
+  <div class="row"><label data-i18n="s_theme">Тема</label><div class="seg" id="sTheme"><button data-v="dark" data-i18n="s_dark">Тёмная</button><button data-v="light" data-i18n="s_light">Светлая</button></div></div>
+  <div class="row"><label data-i18n="s_lang">Язык</label><div class="seg" id="sLang"><button data-v="auto" data-i18n="s_auto">Авто</button><button data-v="ru">RU</button><button data-v="en">EN</button></div></div>
+  <div class="row"><label for="sSens" data-i18n="s_sens">Скорость курсора</label><input type="range" id="sSens" min="0.8" max="4" step="0.1"></div>
+  <div class="row"><label for="sScroll" data-i18n="s_scroll">Скорость прокрутки</label><input type="range" id="sScroll" min="0.5" max="4" step="0.1"></div>
+  <div class="row"><label for="sNat" data-i18n="s_nat">Натуральная прокрутка</label><input type="checkbox" id="sNat"></div>
+  <div class="row"><label for="sTap" data-i18n="s_tap">Тап = клик, тап и тащи</label><input type="checkbox" id="sTap"></div>
+  <div class="row"><label for="sTrail" data-i18n="s_trail">Точечный след под пальцем</label><input type="checkbox" id="sTrail"></div>
+  <button class="ghost" id="sDone" data-i18n="s_done">Готово</button>
+  <button class="ghost danger" id="sLogout" data-i18n="s_logout">Забыть PIN</button>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const store = {
+    get(k, d = '') { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
+  };
+
+  /* ── settings ── */
+  let S = { sens: 1.8, scroll: 2.2, natural: true, tapClick: true, trail: true, theme: 'dark', lang: 'auto' };
+  try { Object.assign(S, JSON.parse(store.get('tp.settings', '{}'))); } catch {}
+  const saveS = () => store.set('tp.settings', JSON.stringify(S));
+
+  /* ── language: Russian / English (auto = the phone's language, ?lang=en forces it) ── */
+  const I18N = {
+    ru: {
+      login_title: 'Тачпад', login_hint: 'Введи PIN с экрана Mac', login_btn: 'Войти',
+      connecting: 'Подключаюсь…', connected: 'Подключено к Mac', offline: 'Нет связи с Mac',
+      wrong_pin: 'Неверный PIN', too_many: n => `Слишком много попыток. Подожди ${n} с`,
+      settings: 'Настройки',
+      hint1: '<b>Один палец</b> — курсор',
+      hint2: '<b>Тап</b> — клик · <b>тап и тащи</b> — перетаскивание',
+      hint3: '<b>Два пальца</b> — прокрутка · <b>тап двумя</b> — правый клик',
+      left: 'Левая кнопка', right: 'Правая кнопка',
+      k_kbd: '⌨︎ Клавиатура', k_desk_l: '‹ Стол', k_desk_r: 'Стол ›', k_space: 'Пробел',
+      s_theme: 'Тема', s_dark: 'Тёмная', s_light: 'Светлая', s_lang: 'Язык', s_auto: 'Авто',
+      s_sens: 'Скорость курсора', s_scroll: 'Скорость прокрутки', s_nat: 'Натуральная прокрутка',
+      s_tap: 'Тап = клик, тап и тащи', s_trail: 'Точечный след под пальцем', s_done: 'Готово', s_logout: 'Забыть PIN',
+    },
+    en: {
+      login_title: 'Touchpad', login_hint: 'Enter the PIN shown on your Mac', login_btn: 'Connect',
+      connecting: 'Connecting…', connected: 'Connected to your Mac', offline: "Can't reach your Mac",
+      wrong_pin: 'Wrong PIN', too_many: n => `Too many attempts. Wait ${n} s`,
+      settings: 'Settings',
+      hint1: '<b>One finger</b> — move the cursor',
+      hint2: '<b>Tap</b> — click · <b>tap and drag</b> — drag',
+      hint3: '<b>Two fingers</b> — scroll · <b>two-finger tap</b> — right click',
+      left: 'Left button', right: 'Right button',
+      k_kbd: '⌨︎ Keyboard', k_desk_l: '‹ Desktop', k_desk_r: 'Desktop ›', k_space: 'Space',
+      s_theme: 'Theme', s_dark: 'Dark', s_light: 'Light', s_lang: 'Language', s_auto: 'Auto',
+      s_sens: 'Cursor speed', s_scroll: 'Scroll speed', s_nat: 'Natural scrolling',
+      s_tap: 'Tap to click, tap and drag', s_trail: 'Dot trail under your finger', s_done: 'Done', s_logout: 'Forget PIN',
+    },
+  };
+  function curLang() {
+    const q = new URLSearchParams(location.search).get('lang');
+    if (q === 'ru' || q === 'en') return q;
+    if (S.lang === 'ru' || S.lang === 'en') return S.lang;
+    return /^ru/i.test(navigator.language || '') ? 'ru' : 'en';
+  }
+  let L = curLang();
+  const tr = (k, ...a) => { const v = I18N[L][k]; return typeof v === 'function' ? v(...a) : v; };
+  let statusState = ['wait', 'connecting'];
+  function applyLang() {
+    L = curLang();
+    document.documentElement.lang = L;
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = tr(el.dataset.i18nHtml); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', tr(el.dataset.i18nAria)); });
+    document.querySelectorAll('#sLang button').forEach(b => b.classList.toggle('on', b.dataset.v === (S.lang || 'auto')));
+    document.title = tr('login_title');
+    buildKeys();
+    setStatus(statusState[0], statusState[1]);
+  }
+
+  /* ── connection ── */
+  let ws = null, authed = false, retry = 0, pin = store.get('tp.pin'), pingT = 0, reconnT = 0;
+
+  function setStatus(kind, key) {
+    statusState = [kind, key];
+    $('#dot').className = 'dot ' + (kind === 'ok' ? 'ok' : kind === 'bad' ? 'bad' : '');
+    $('#status').textContent = tr(key);
+  }
+  function showLogin(err) {
+    $('#app').classList.remove('show');
+    $('#login').classList.add('show');
+    $('#loginErr').textContent = err || '';
+  }
+  function showApp() {
+    $('#login').classList.remove('show');
+    $('#app').classList.add('show');
+    keepAwake();
+  }
+  function send(o) {
+    if (ws && ws.readyState === 1 && authed) ws.send(JSON.stringify(o));
+  }
+  function sendAuth(p) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'auth', pin: p }));
+  }
+
+  function connect() {
+    clearTimeout(reconnT);
+    if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
+    setStatus('wait', 'connecting');
+    ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+    const mine = ws;
+    mine.onopen = () => { retry = 0; if (pin) sendAuth(pin); else showLogin(''); };
+    mine.onmessage = ev => {
+      let m; try { m = JSON.parse(ev.data); } catch { return; }
+      if (m.t !== 'auth') return;
+      if (m.ok) {
+        authed = true; store.set('tp.pin', pin);
+        showApp(); setStatus('ok', 'connected');
+        clearInterval(pingT); pingT = setInterval(() => ws && ws.readyState === 1 && ws.send('{"t":"ping"}'), 10000);
+      } else {
+        authed = false; pin = ''; store.del('tp.pin');
+        showLogin(m.wait ? tr('too_many', m.wait) : tr('wrong_pin'));
+      }
+    };
+    mine.onclose = () => {
+      if (ws !== mine) return;
+      authed = false; clearInterval(pingT);
+      setStatus('bad', 'offline');
+      reconnT = setTimeout(connect, Math.min(3000, 400 + retry++ * 400));
+    };
+    mine.onerror = () => {};
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { keepAwake(); connect(); }
+  });
+
+  let wl = null;
+  async function keepAwake() {
+    try { if (!wl && navigator.wakeLock) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } } catch {}
+  }
+
+  $('#loginBtn').addEventListener('click', () => {
+    const v = $('#pin').value.trim();
+    if (!v) return;
+    pin = v; $('#loginErr').textContent = '';
+    sendAuth(pin);
+  });
+  $('#pin').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loginBtn').click(); });
+
+  /* ── touchpad ── */
+  const pad = $('#pad');
+  const T = new Map();               // fingers currently on the pad
+  let mode = 'none';                 // none | move | scroll | drag | ignore
+  let maxN = 0, t0 = 0, travel = 0, heldX = 0, heldY = 0, lastTapEnd = 0;
+  let pdx = 0, pdy = 0, sdx = 0, sdy = 0, raf = 0;
+
+  function schedule() { if (!raf) raf = requestAnimationFrame(flush); }
+  function flush() {
+    raf = 0;
+    if (pdx || pdy) {
+      const sp = Math.hypot(pdx, pdy);
+      const g = S.sens * (1 + Math.min(sp, 40) * 0.07);   // acceleration: a faster finger moves the cursor further
+      send({ t: 'move', dx: +(pdx * g).toFixed(2), dy: +(pdy * g).toFixed(2) });
+      pdx = pdy = 0;
+    }
+    if (sdx || sdy) {
+      const k = S.scroll * (S.natural ? 1 : -1);
+      send({ t: 'scroll', dx: +(sdx * k).toFixed(2), dy: +(sdy * k).toFixed(2) });
+      sdx = sdy = 0;
+    }
+  }
+
+  /* ── halftone dot trail under the finger (HalftoneTrail-style) ──
+     A grid of dots: where a finger passes the dots grow, then shrink back smoothly. */
+  const HT = { cell: 10, color: '#f2f2f5', decay: 0.965, brush: 0.045, hoverBrush: 0.012, opacity: 1, hoverOpacity: 0.15, speed: 38 };
+  const cv = $('#trail'), cx2 = cv.getContext('2d');
+  let tW = 0, tH = 0, tDpr = 1, cols = 0, rows = 0, fSize = new Float32Array(0), fAlpha = new Float32Array(0);
+  let tRect = null, tRun = false, tLast = 0;
+
+  function trailResize() {
+    tRect = pad.getBoundingClientRect(); tW = tRect.width; tH = tRect.height;
+    tDpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(tW * tDpr); cv.height = Math.round(tH * tDpr);
+    cols = Math.ceil(tW / HT.cell); rows = Math.ceil(tH / HT.cell);
+    fSize = new Float32Array(cols * rows); fAlpha = new Float32Array(cols * rows);
+  }
+  if (window.ResizeObserver) new ResizeObserver(trailResize).observe(pad);
+  trailResize();
+
+  function stamp(x, y, strength, hover, mult) {
+    if (!S.trail || !cols) return;
+    const R = Math.max(HT.cell * 0.75, (hover ? HT.hoverBrush : HT.brush) * (tW + tH) / 2 * (mult || 1));
+    const a = hover ? HT.hoverOpacity : HT.opacity;
+    const c0 = Math.max(0, Math.floor((x - R) / HT.cell)), c1 = Math.min(cols - 1, Math.floor((x + R) / HT.cell));
+    const r0 = Math.max(0, Math.floor((y - R) / HT.cell)), r1 = Math.min(rows - 1, Math.floor((y + R) / HT.cell));
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      const d = Math.hypot((c + 0.5) * HT.cell - x, (r + 0.5) * HT.cell - y);
+      if (d > R) continue;
+      const t = 1 - d / R, w = t * t * (3 - 2 * t) * strength, i = r * cols + c;
+      if (w > fSize[i]) fSize[i] = w;
+      if (a > fAlpha[i]) fAlpha[i] = a;
+    }
+    if (!tRun) { tRun = true; tLast = performance.now(); requestAnimationFrame(trailTick); }
+  }
+
+  function trailSeg(x0, y0, x1, y1, hover) {            // trail between two points, strength depends on speed
+    if (!tRect) return;
+    x0 -= tRect.left; y0 -= tRect.top; x1 -= tRect.left; y1 -= tRect.top;
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    const s = Math.min(1, 0.35 + 0.65 * dist / HT.speed);
+    const n = Math.max(1, Math.ceil(dist / (HT.cell * 0.5)));
+    for (let k = 1; k <= n; k++) stamp(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, s, hover);
+  }
+
+  function trailTick(now) {
+    const k = Math.pow(HT.decay, Math.min(50, now - tLast) / 16.67);   // same decay on 60 and 120 Hz screens
+    tLast = now;
+    cx2.setTransform(tDpr, 0, 0, tDpr, 0, 0);
+    cx2.clearRect(0, 0, tW, tH);
+    cx2.fillStyle = S.theme === 'light' ? '#1c1c1e' : HT.color;
+    let alive = false;
+    for (let i = 0, n = fSize.length; i < n; i++) {
+      let v = fSize[i];
+      if (v <= 0) continue;
+      v *= k;
+      if (v < 0.04) { fSize[i] = 0; fAlpha[i] = 0; continue; }
+      fSize[i] = v; alive = true;
+      cx2.globalAlpha = fAlpha[i];
+      cx2.beginPath();
+      cx2.arc(((i % cols) + 0.5) * HT.cell, (((i / cols) | 0) + 0.5) * HT.cell, v * HT.cell * 0.62, 0, 6.2832);
+      cx2.fill();
+    }
+    if (alive) requestAnimationFrame(trailTick); else { tRun = false; cx2.clearRect(0, 0, tW, tH); }
+  }
+
+  function ripple(clientX, clientY) {                    // tap: a big burst of dots
+    if (tRect) stamp(clientX - tRect.left, clientY - tRect.top, 1, false, 1.8);
+  }
+
+  pad.addEventListener('touchstart', e => {
+    e.preventDefault();
+    pad.classList.add('used');
+    const now = performance.now();
+    for (const t of e.changedTouches) T.set(t.identifier, { x: t.clientX, y: t.clientY });
+    tRect = pad.getBoundingClientRect();
+    for (const t of e.changedTouches) stamp(t.clientX - tRect.left, t.clientY - tRect.top, 0.6, T.size >= 2);
+    if (T.size === 1 && mode === 'none') {
+      t0 = now; maxN = 1; travel = 0; heldX = heldY = 0;
+      if (S.tapClick && now - lastTapEnd < 300) {      // tap then touch again at once: drag (or double click)
+        mode = 'drag'; send({ t: 'down', b: 'left' });
+      } else mode = 'move';
+    } else if (T.size >= 2) {
+      if (mode === 'drag') send({ t: 'up', b: 'left' });
+      if (mode !== 'scroll') { mode = 'scroll'; travel = 0; heldX = heldY = 0; }
+      maxN = Math.max(maxN, T.size);
+    }
+  }, { passive: false });
+
+  pad.addEventListener('touchmove', e => {
+    e.preventDefault();
+    let dx = 0, dy = 0, n = 0;
+    for (const t of e.changedTouches) {
+      const p = T.get(t.identifier); if (!p) continue;
+      trailSeg(p.x, p.y, t.clientX, t.clientY, mode === 'scroll');
+      dx += t.clientX - p.x; dy += t.clientY - p.y; p.x = t.clientX; p.y = t.clientY; n++;
+    }
+    if (!n) return;
+    if (mode === 'move' || mode === 'drag') {
+      travel += Math.hypot(dx, dy);
+      if (mode === 'move' && travel < 5) { heldX += dx; heldY += dy; return; }   // ignore finger jitter during a tap
+      pdx += dx + heldX; pdy += dy + heldY; heldX = heldY = 0; schedule();
+    } else if (mode === 'scroll') {
+      const ax = dx / T.size, ay = dy / T.size;                                   // average over the fingers
+      travel += Math.hypot(ax, ay);
+      if (travel < 5) { heldX += ax; heldY += ay; return; }
+      sdx += ax + heldX; sdy += ay + heldY; heldX = heldY = 0; schedule();
+    }
+  }, { passive: false });
+
+  function endTouch(e, cancelled) {
+    e.preventDefault();
+    const last = e.changedTouches[0];
+    for (const t of e.changedTouches) T.delete(t.identifier);
+    if (T.size === 0) {
+      const now = performance.now(), dur = now - t0;
+      flush();
+      if (mode === 'drag') {
+        send({ t: 'up', b: 'left' }); lastTapEnd = 0;
+      } else if (!cancelled && S.tapClick && mode === 'move' && maxN === 1 && dur < 260 && travel < 8) {
+        send({ t: 'click', b: 'left' }); lastTapEnd = now; ripple(last.clientX, last.clientY, false);
+      } else if (!cancelled && mode === 'scroll' && maxN === 2 && dur < 320 && travel < 8) {
+        send({ t: 'click', b: 'right' }); lastTapEnd = 0; ripple(last.clientX, last.clientY, true);
+      }
+      mode = 'none'; maxN = 0;
+    } else if (mode === 'scroll' && T.size < 2) {
+      mode = 'ignore';                                // a lone finger left after scrolling must not move the cursor
+    }
+  }
+  pad.addEventListener('touchend', e => endTouch(e, false), { passive: false });
+  pad.addEventListener('touchcancel', e => endTouch(e, true), { passive: false });
+
+  /* ── left / right buttons (hold one, move with another finger) ── */
+  function holdButton(el, b) {
+    let id = null;
+    el.addEventListener('touchstart', e => {
+      e.preventDefault();
+      if (id !== null) return;
+      id = e.changedTouches[0].identifier; el.classList.add('on'); send({ t: 'down', b });
+    }, { passive: false });
+    const up = e => {
+      e.preventDefault();
+      if (id === null) return;
+      for (const t of e.changedTouches) if (t.identifier === id) { id = null; el.classList.remove('on'); send({ t: 'up', b }); }
+    };
+    el.addEventListener('touchend', up, { passive: false });
+    el.addEventListener('touchcancel', up, { passive: false });
+  }
+  holdButton($('#bl'), 'left');
+  holdButton($('#br'), 'right');
+
+  /* ── keys (a label starting with "@" is a translation key) ── */
+  const KEYS = [
+    ['kbd', '@k_kbd'],
+    ['esc', 'Esc'], ['tab', 'Tab'], ['return', '⏎'], ['backspace', '⌫'],
+    ['left', '←'], ['up', '↑'], ['down', '↓'], ['right', '→'],
+    ['c', '⌘C', ['cmd']], ['v', '⌘V', ['cmd']], ['a', '⌘A', ['cmd']], ['z', '⌘Z', ['cmd']],
+    ['tab', '⌘Tab', ['cmd']], ['up', 'Mission Control', ['ctrl']],
+    ['left', '@k_desk_l', ['ctrl']], ['right', '@k_desk_r', ['ctrl']], ['space', '@k_space'],
+  ];
+  const kbd = $('#kbd');
+  function buildKeys() {
+    const box = $('#keys');
+    box.textContent = '';
+    for (const [k, label, mods] of KEYS) {
+      const b = document.createElement('button');
+      b.className = 'chip' + (k === 'kbd' ? ' kb' : '');
+      b.textContent = label[0] === '@' ? tr(label.slice(1)) : label;
+      b.addEventListener('mousedown', e => e.preventDefault());       // keep focus in the keyboard field
+      b.addEventListener('click', () => {
+        if (k === 'kbd') { document.activeElement === kbd ? kbd.blur() : kbd.focus(); }
+        else send({ t: 'key', k, m: mods || [] });
+      });
+      box.appendChild(b);
+    }
+  }
+
+  const SPECIAL = { Backspace: 'backspace', Enter: 'return', Tab: 'tab', Escape: 'esc', ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Delete: 'delete' };
+  kbd.addEventListener('keydown', e => {
+    if (SPECIAL[e.key]) { e.preventDefault(); send({ t: 'key', k: SPECIAL[e.key] }); }
+  });
+  kbd.addEventListener('beforeinput', e => {
+    const ty = e.inputType;
+    if ((ty === 'insertText' || ty === 'insertCompositionText' || ty === 'insertFromPaste' || ty === 'insertReplacementText') && e.data) {
+      e.preventDefault(); send({ t: 'text', s: e.data });
+    } else if (ty === 'deleteContentBackward') { e.preventDefault(); send({ t: 'key', k: 'backspace' }); }
+    else if (ty === 'insertLineBreak' || ty === 'insertParagraph') { e.preventDefault(); send({ t: 'key', k: 'return' }); }
+  });
+  kbd.addEventListener('input', () => { if (kbd.value) { send({ t: 'text', s: kbd.value }); kbd.value = ''; } });
+
+  /* ── settings sheet ── */
+  const sheet = $('#sheet');
+  $('#sSens').value = S.sens; $('#sScroll').value = S.scroll; $('#sNat').checked = S.natural; $('#sTap').checked = S.tapClick;
+  $('#sSens').addEventListener('input', e => { S.sens = +e.target.value; saveS(); });
+  $('#sScroll').addEventListener('input', e => { S.scroll = +e.target.value; saveS(); });
+  $('#sNat').addEventListener('change', e => { S.natural = e.target.checked; saveS(); });
+  $('#sTap').addEventListener('change', e => { S.tapClick = e.target.checked; saveS(); });
+  function applyTheme(t) {
+    const light = t === 'light';
+    document.documentElement.dataset.theme = light ? 'light' : 'dark';
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = light ? '#f2f2f7' : '#09090b';
+    document.querySelectorAll('#sTheme button').forEach(b => b.classList.toggle('on', b.dataset.v === (light ? 'light' : 'dark')));
+  }
+  applyTheme(S.theme);
+  document.querySelectorAll('#sTheme button').forEach(b => b.addEventListener('click', () => { S.theme = b.dataset.v; saveS(); applyTheme(S.theme); }));
+  document.querySelectorAll('#sLang button').forEach(b => b.addEventListener('click', () => { S.lang = b.dataset.v; saveS(); applyLang(); }));
+  $('#sTrail').checked = S.trail;
+  $('#sTrail').addEventListener('change', e => { S.trail = e.target.checked; saveS(); });
+  $('#gear').addEventListener('click', () => sheet.classList.add('open'));
+  $('#sDone').addEventListener('click', () => sheet.classList.remove('open'));
+  $('#sLogout').addEventListener('click', () => {
+    store.del('tp.pin'); pin = ''; authed = false; sheet.classList.remove('open');
+    if (ws) ws.close(); showLogin('');
+  });
+
+  applyLang();
+  connect();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+<style>
+  .d { fill:#fff; animation:pulse 2.2s ease-in-out infinite; }
+  .cur { animation:nudge 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity:.22; } 35% { opacity:1; } }
+  @keyframes nudge { 0%,100% { transform:translate(0,0); } 45% { transform:translate(-5px,-5px); } }
+  @media (prefers-reduced-motion: reduce) { .d, .cur { animation:none; } }
+</style>
+<rect width="180" height="180" rx="40" fill="#000"/>
+<g>
+  <circle class="d" cx="65.7" cy="100.3" r="0.92" style="animation-delay:0.00s"/>
+  <circle class="d" cx="76.9" cy="77.8" r="0.90" style="animation-delay:0.00s"/>
+  <circle class="d" cx="76.9" cy="89.0" r="2.69" style="animation-delay:0.00s"/>
+  <circle class="d" cx="76.9" cy="100.3" r="3.42" style="animation-delay:0.00s"/>
+  <circle class="d" cx="76.9" cy="111.5" r="2.30" style="animation-delay:0.00s"/>
+  <circle class="d" cx="88.1" cy="77.8" r="1.72" style="animation-delay:0.00s"/>
+  <circle class="d" cx="88.1" cy="89.0" r="4.23" style="animation-delay:0.00s"/>
+  <circle class="d" cx="88.1" cy="100.3" r="5.27" style="animation-delay:0.00s"/>
+  <circle class="d" cx="88.1" cy="111.5" r="3.67" style="animation-delay:0.00s"/>
+  <circle class="d" cx="88.1" cy="122.7" r="1.10" style="animation-delay:0.02s"/>
+  <circle class="d" cx="99.4" cy="77.8" r="1.33" style="animation-delay:0.05s"/>
+  <circle class="d" cx="99.4" cy="89.0" r="3.69" style="animation-delay:0.07s"/>
+  <circle class="d" cx="99.4" cy="100.3" r="4.95" style="animation-delay:0.10s"/>
+  <circle class="d" cx="99.4" cy="111.5" r="3.67" style="animation-delay:0.15s"/>
+  <circle class="d" cx="110.6" cy="89.0" r="2.51" style="animation-delay:0.17s"/>
+  <circle class="d" cx="99.4" cy="122.7" r="1.26" style="animation-delay:0.20s"/>
+  <circle class="d" cx="110.6" cy="100.3" r="4.18" style="animation-delay:0.21s"/>
+  <circle class="d" cx="121.8" cy="89.0" r="1.18" style="animation-delay:0.26s"/>
+  <circle class="d" cx="110.6" cy="111.5" r="3.86" style="animation-delay:0.27s"/>
+  <circle class="d" cx="121.8" cy="100.3" r="2.90" style="animation-delay:0.32s"/>
+  <circle class="d" cx="110.6" cy="122.7" r="1.87" style="animation-delay:0.35s"/>
+  <circle class="d" cx="121.8" cy="111.5" r="3.65" style="animation-delay:0.38s"/>
+  <circle class="d" cx="133.1" cy="100.3" r="1.31" style="animation-delay:0.41s"/>
+  <circle class="d" cx="121.8" cy="122.7" r="2.58" style="animation-delay:0.47s"/>
+  <circle class="d" cx="133.1" cy="111.5" r="2.52" style="animation-delay:0.47s"/>
+  <circle class="d" cx="133.1" cy="122.7" r="2.77" style="animation-delay:0.55s"/>
+  <circle class="d" cx="144.3" cy="111.5" r="0.91" style="animation-delay:0.55s"/>
+  <circle class="d" cx="121.8" cy="134.0" r="0.96" style="animation-delay:0.56s"/>
+  <circle class="d" cx="144.3" cy="122.7" r="1.65" style="animation-delay:0.63s"/>
+  <circle class="d" cx="133.1" cy="134.0" r="1.78" style="animation-delay:0.65s"/>
+  <circle class="d" cx="144.3" cy="134.0" r="1.70" style="animation-delay:0.72s"/>
+  <circle class="d" cx="144.3" cy="145.2" r="1.01" style="animation-delay:0.81s"/>
+</g>
+<polygon class="cur" points="45.9,34.2 45.9,118.7 67.4,98.8 81.8,134.1 96.6,128.0 82.3,94.2 110.4,93.6" fill="#fff" stroke="#000" stroke-width="5.4" stroke-linejoin="round" paint-order="stroke"/>
+</svg>

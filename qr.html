@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="__LANG__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Touchpad</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+  :root { color-scheme: dark; --bg:#09090b; --panel:#141417; --line:#26262b; --text:#f2f2f5; --dim:#8b8b95; --accent:#0a84ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--text);
+         font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; }
+  main { width:min(420px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:28px; padding:28px; text-align:center; }
+  h1 { margin:0 0 4px; font-size:22px; }
+  p { margin:0; color:var(--dim); }
+  #qr { margin:22px auto; width:232px; height:232px; padding:8px; background:#fff; border-radius:16px; display:grid; place-items:center; color:#333; font-size:13px; }
+  #qr img, #qr canvas { max-width:100%; }
+  .url { font:600 17px ui-monospace,SFMono-Regular,Menlo,monospace; word-break:break-all; color:var(--accent); }
+  .pin { margin-top:18px; font:700 40px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.18em; }
+  .small { margin-top:6px; font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title"></h1>
+  <p id="scan"></p>
+  <div id="qr"></div>
+  <div class="url">__URL__</div>
+  <div class="pin">__PIN__</div>
+  <p class="small" id="note"></p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  const T = {
+    en: { title: 'Touchpad for iPhone', scan: 'Point your iPhone camera at the code', note: 'Enter the PIN once on the phone, it will remember it', noqr: 'The QR code did not load, type the address by hand' },
+    ru: { title: 'Тачпад для iPhone', scan: 'Наведи камеру iPhone на код', note: 'PIN вводится один раз на телефоне, дальше он запомнит', noqr: 'QR не загрузился, введи адрес вручную' },
+  }[document.documentElement.lang] || {};
+  document.title = T.title;
+  document.getElementById('title').textContent = T.title;
+  document.getElementById('scan').textContent = T.scan;
+  document.getElementById('note').textContent = T.note;
+  try {
+    new QRCode(document.getElementById('qr'), { text: '__URL__', width: 216, height: 216, correctLevel: QRCode.CorrectLevel.M });
+  } catch (e) {
+    document.getElementById('qr').textContent = T.noqr;
+  }
+</script>
+</body>
+</html>
