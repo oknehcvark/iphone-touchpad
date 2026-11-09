@@ -222,6 +222,7 @@ write_png(OUT / "favicon-32.png", 32, 8, True)           # rounded, transparent 
 write_png(OUT / "apple-touch-icon.png", 180, 4, False)   # square: iOS rounds it itself
 write_png(OUT / "icon-192.png", 192, 4, False)
 write_png(OUT / "icon-512.png", 512, 3, False)
+write_png(OUT / "icon-rounded-512.png", 512, 3, True)    # source of the menu bar app's .icns
 
 # centring check: bounding box of everything drawn
 bx = [p[0] for p in CUR] + [d[0] - d[2] for d in DOTS] + [d[0] + d[2] for d in DOTS]

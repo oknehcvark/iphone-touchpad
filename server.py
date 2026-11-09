@@ -39,6 +39,18 @@ PORT = PORT_START
 GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 PIN_FILE = HERE / ".pin"
 LOOPBACK = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
+CLIENTS = set()  # phones that signed in with the PIN right now
+
+
+def local_request(peer, headers):
+    """True only for requests from this Mac that also name a local host.
+    The Host check blocks DNS-rebinding: a web page cannot read /qr or /status
+    through a hostname that merely resolves to 127.0.0.1."""
+    host = headers.get("host", "").lower()
+    if not host.endswith("]"):
+        host = host.rsplit(":", 1)[0]
+    return peer in LOOPBACK and host in LOCAL_HOSTS
 # Icons from the assets folder (only this list is served, nothing else on disk)
 ASSETS = {
     "/icon.svg": ("icon.svg", "image/svg+xml"),
@@ -415,6 +427,7 @@ async def ws_session(reader, writer, key, peer):
                     continue
                 if secrets.compare_digest(str(msg.get("pin", "")), PIN):
                     authed = True
+                    CLIENTS.add(writer)
                     auth_fails = 0
                     ws_send(writer, {"t": "auth", "ok": True})
                     print(m("authok", peer=peer))
@@ -453,6 +466,7 @@ async def ws_session(reader, writer, key, peer):
     except (asyncio.IncompleteReadError, asyncio.TimeoutError, ConnectionError, ValueError):
         pass
     finally:
+        CLIENTS.discard(writer)
         mouse.release_all()
         print(m("disc", peer=peer))
 
@@ -515,7 +529,12 @@ async def handle(reader, writer):
             }
             http(writer, "200 OK", json.dumps(manifest, ensure_ascii=False),
                  "application/manifest+json; charset=utf-8")
-        elif path == "/qr" and peer in LOOPBACK:
+        elif path == "/status" and local_request(peer, h):
+            body = {"pin": PIN, "port": PORT, "host": socket.gethostname(),
+                    "urls": [f"http://{ip}:{PORT}/" for ip in lan_ips()],
+                    "clients": len(CLIENTS), "trusted": ax_trusted()}
+            http(writer, "200 OK", json.dumps(body), "application/json")
+        elif path == "/qr" and local_request(peer, h):
             ips = lan_ips()
             url = f"http://{ips[0] if ips else 'localhost'}:{PORT}/"
             page = ((HERE / "qr.html").read_text().replace("__URL__", url).replace("__PIN__", PIN)

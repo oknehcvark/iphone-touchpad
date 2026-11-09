@@ -52,6 +52,16 @@ To have the server start by itself whenever you log in to your Mac:
 
 It installs a LaunchAgent, prints your PIN and opens the Accessibility settings: switch on **Python** there, then restart the server with the command it prints. From then on you only open the icon on your phone. Remove it with `./uninstall-autostart.sh`.
 
+### Menu bar icon
+
+For a small icon next to the battery (needs the Xcode command line tools: `xcode-select --install`):
+
+```bash
+./install-menubar.sh
+```
+
+Click it to see whether a phone is connected, copy the PIN or the address, open the QR code page or restart the server. It starts at every login. Remove it with `./uninstall-menubar.sh`. The icon only reads `http://127.0.0.1:8899/status` from the server and needs no macOS permissions of its own.
+
 ## Gestures
 
 | Gesture | What it does |
@@ -76,7 +86,7 @@ The Mac runs a small HTTP + WebSocket server (`server.py`). Safari loads `index.
 - Anyone who knows the PIN and is on your network can control your Mac. The PIN is 6 random digits kept in `.pin` (it is in `.gitignore`). After 5 wrong attempts the server locks out PIN checks for a while, longer with each failure.
 - Traffic is plain HTTP on your local network and is not encrypted. Use it on a Wi-Fi network you trust, and never forward the port to the internet.
 - The server listens on all network interfaces, port 8899. Stop it with Ctrl+C or remove the autostart when you do not need it.
-- The QR / PIN page (`/qr`) is only served to the Mac itself.
+- The QR / PIN page (`/qr`) and `/status` are only served to the Mac itself, and only under `localhost` names, which also blocks DNS-rebinding tricks from web pages.
 
 ## Troubleshooting
 
@@ -97,7 +107,9 @@ The Mac runs a small HTTP + WebSocket server (`server.py`). Safari loads `index.
 | `docs/` | Images for this README |
 | `tools/make_icons.py` | Regenerates the icons and banners (pure Python) |
 | `start.command` | Double-click launcher |
-| `install-autostart.sh`, `uninstall-autostart.sh` | Start at login |
+| `install-autostart.sh`, `uninstall-autostart.sh` | Start the server at login |
+| `menubar/Touchpad.swift` | The menu bar icon (Swift) |
+| `install-menubar.sh`, `uninstall-menubar.sh` | Build and start the menu bar icon |
 
 ## Limitations
 
